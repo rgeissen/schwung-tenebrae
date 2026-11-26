@@ -217,6 +217,10 @@ typedef struct {
     float    spread_pos;    /* -1..1: where Spread puts this note in the stereo field */
     float    main_g, lay_g;
     uint32_t rng;
+    /* Modulation, live (read by get_param("live_mod")), this control tick's:
+     * the cutoff in octaves above 20 Hz (knob, key, envelope, velocity, Age,
+     * pressure and LFO) and the shape (0..1, the shape knob's units) */
+    float    live_cut_oct, live_shape;
 } tb_voice_t;
 
 typedef struct {
@@ -940,6 +944,7 @@ static void tb_voice_render(tb_engine_t *e, tb_voice_t *v, const tb_frame_t *f, 
     float shape = f->shape + f->shape_env * fe;
     if (f->lfo_dest == D_SHAPE) shape += lfo_v * dep * 0.45f;
     shape = tb_clamp01(shape);
+    v->live_shape = shape;
 
     tb_octl_t oc, lc;
     tb_osc_control(model, shape, dt0, semis, &oc);
@@ -997,6 +1002,7 @@ static void tb_voice_render(tb_engine_t *e, tb_voice_t *v, const tb_frame_t *f, 
         v->sh_cur += (f->lfo_sh - v->sh_cur) * 0.5f;
         cut_oct += v->sh_cur * dep * dep * 4.0f;
     }
+    v->live_cut_oct = cut_oct;
     float fc = 20.0f * exp2f(cut_oct);
     fc = tb_clamp(fc, 16.0f, 15500.0f);
     /* the core runs twice per sample, so its coefficient is for 2 x the rate */

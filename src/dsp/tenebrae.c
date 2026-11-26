@@ -970,6 +970,25 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     }
     else if (strcmp(key, "octave_transpose") == 0) n = snprintf(buf, (size_t)buf_len, "%d", inst->eng.octave);
     else if (strcmp(key, "polyphony") == 0) n = snprintf(buf, (size_t)buf_len, "%d", inst->eng.active_voices);
+    /* Modulation, live: where the newest sounding voice has its modulated
+     * controls now, in their knobs' units: cutoff 0..1 (the knob law
+     * 20 Hz * 2^(10 c) at its middle, inverted: octaves / 10, with the
+     * engine's 15.5 kHz ceiling) and shape 0..1; {} while no voice sounds */
+    else if (strcmp(key, "live_mod") == 0) {
+        const tb_voice_t *nv = NULL;
+        for (int i = 0; i < TB_VOICES; i++) {
+            const tb_voice_t *v = &inst->eng.v[i];
+            if (v->active && (!nv || v->stamp > nv->stamp)) nv = v;
+        }
+        if (!nv) n = snprintf(buf, (size_t)buf_len, "{}");
+        else {
+            float oct = nv->live_cut_oct;
+            if (oct > 9.5980525f) oct = 9.5980525f;   /* log2(15500 / 20) */
+            n = snprintf(buf, (size_t)buf_len, "{\"cutoff\":%.4f,\"shape\":%.4f}",
+                         (double)tb_clamp01(oct / 10.0f), (double)nv->live_shape);
+        }
+        return n;
+    }
     if (n >= 0) return n < buf_len ? n : buf_len - 1;
 
     {
